@@ -30,7 +30,7 @@ of lists. Below are examples of both:
       | [] -> 0
       | hd :: tl -> hd + sum tl ;;
 
-As noted in the book, the above functional recursive implementations
+As noted in the book, these functional recursive implementations
 may run into stack overflow errors when called on exceptionally long
 lists. 
 
@@ -65,8 +65,8 @@ tail-recursive form.
 ......................................................................
 Exercise 1: Tail-recursive sum 
 
-Rewrite the sum function to be tail recursive. (As usual, for this and
-succeeding exercises, you shouldn't feel beholden to how the
+Rewrite the `sum` function to be tail recursive. (As usual, for this
+and succeeding exercises, you shouldn't feel beholden to how the
 definition is introduced in the skeleton code below. For instance, you
 might want to add a `rec`, or use a different argument list, or no
 argument list at all but binding to an anonymous function instead.)
@@ -92,19 +92,22 @@ Exercise 2: Write a tail-recursive function `prods` that finds the
 product of the corresponding elements of two integer lists. Your
 function should raise a `Failure` exception when called on lists of
 differing length. You may remember implementing a similar function in
-Lab 2.
+Lab 2. It should work like this:
 
-Your initial tail-recursive function may output a list that is in
-reverse order of your expected output. This is a common outcome in
-tail-recursive list iteration functions. (In general, you'd want to
+   # prods [1; 2; 3] [1; 2; 3] ;;
+   -: int list = [1; 4; 9] 
+
+Your initial try at a tail-recursive function may output a list that
+is in reverse order of your expected output. This is a common outcome
+in tail-recursive list iteration functions. (In general, you'd want to
 consider whether or not this has negative outcomes on your intended
 use case. It may be that the output order is not significant.)
 
 In this case, for testing purposes, please preserve the initial
-ordering of the lists.
-
-   # prods [1; 2; 3] [1; 2; 3] ;;
-   -: int list = [1; 4; 9] 
+ordering of the lists. One method to do so is simply to reverse the
+list at the end, using a tail-recursive reversal function of
+course. Fortunately, the built-in `List.rev` is tail-recursive (even
+though the documentation doesn't mention that fact).
 ....................................................................*)
 
 let prods (xs : int list) (ys : int list) : int list =
@@ -116,10 +119,10 @@ let prods (xs : int list) (ys : int list) : int list =
     | [], _
     | _, [] ->
        raise (Failure "Lists must be of same length") in
-  List.rev_append (prods_tr xs ys []) [] ;;
+  List.rev (prods_tr xs ys []) ;;
 
-(* Notice how we reverse the list at the very end using the
-   (tail-recursive) `List.rev_append` function. *)
+(* Notice how we reverse the list at the very end using the `List.rev`
+   function, which is itself tail-recursive. *)
 
 (*....................................................................
 Exercise 3: Modify your `prods` function to use option types to deal
@@ -136,7 +139,7 @@ arguments.
 let prods_opt (xs : int list) (ys : int list) : int list option =
   let rec prods_tr xs ys accum =
     match xs, ys with
-    | [], [] -> Some (List.rev_append accum [])
+    | [], [] -> Some (List.rev accum)
     | [], _
     | _, [] -> None
     | xhd :: xtl, yhd :: ytl ->
@@ -169,8 +172,8 @@ let prods_opt (xs : int list) (ys : int list) : int list option =
       with
       | Failure _ -> None ;;
 
-   This is tail-recursive (vacuously, since it's not recursive at
-   all!), and it calls only tail-recursive functions. *)
+   This is itself tail-recursive (vacuously, since it's not recursive
+   at all!), and it calls only tail-recursive functions. *)
 
 (*....................................................................
 Exercise 4: Finally, combine your `sum` and `prods` functions to
@@ -197,7 +200,8 @@ Part 2: Loops
 Another method of solving the problem of stack overflow when dealing
 with large lists is to use loops. Unlike tail recursion, loops rely on
 state change in order to function, and therefore go beyond the now
-familiar purely functional paradigm.
+familiar purely functional paradigm, bringing us into the domain of
+procedural programming.
 
 Let's get some practice with simple loops.
 
@@ -233,16 +237,35 @@ let odd_for (limit : int) : int list =
   done;
   List.rev (!lst_ref) ;;
 
-(* For reference, here's a functional version using `init` to build a
-   list of the integers and `filter` to select the odd ones: *)
-
+(* For contrast, here are some ways of implementing this function in
+   a functional paradigm. First, a directly recursive version: *)
+  
 let odd_func (limit : int) : int list =
+  let rec odd_from lower =
+    if lower > limit then []
+    else lower :: odd_from (lower + 2) in
+  odd_from 1 ;;
+
+(* We can replace the auxiliary function with a tail-recursive version
+   using an accumulator, so it can handle large lists without stack
+   overflows. *)
+  
+let odd_func_tr (limit : int) : int list =
+  let rec odd_from lower acc =
+    if lower > limit then acc
+    else odd_from (lower + 2) (lower :: acc) in
+  List.rev (odd_from 1 []) ;;
+  
+(* Here's another functional version using `init` to build a list of
+   the integers and `filter` to select the odd ones: *)
+  
+let odd_func_2 (limit : int) : int list =
   List.init limit succ
   |> List.filter (fun x -> x mod 2 <> 0) ;;
 
 (* ...and here's a functional version that just uses `init`: *)
   
-let odd_func_2 (limit : int) : int list =
+let odd_func_3 (limit : int) : int list =
   List.init ((limit + 1) / 2) (fun n -> n * 2 + 1) ;;
 
 (* Here is the `length` function implemented using a `while` loop, as
@@ -321,8 +344,10 @@ that your use cases will have on your design. *)
 (*....................................................................
 Exercise 8: You'll now reimplement one last familiar function:
 reversing a list. Write a non-recursive function `reverse` to reverse
-a list. (This function is implemented recursively in the `List` module
-as `List.rev`, and you've likely used it in previous exercises.)
+a list. (This function is implemented tail-recursively in the `List`
+module as `List.rev` (see
+https://github.com/ocaml/ocaml/blob/trunk/stdlib/list.ml), and you've
+likely used it in previous exercises.)
 ....................................................................*)
 
 let reverse (lst : 'a list) : 'a list =
@@ -349,10 +374,11 @@ lines of a given height as shown in the example below. See
 https://docs.cs50.net/2017/ap/problems/mario/less/mario.html.) *)
 
 (*....................................................................
-Exercise 9: Implement a function that prints out a half-pyramid of a
-specified height, per the below. Use hashes (#) for blocks. The
-function should raise an Invalid_argument exception for ints greater
-than 23. (Why? I don't know. That's just how CS50 did it.)
+Exercise 9: Implement a function in procedural style that prints out a
+half-pyramid of a specified height, per the below. Use hashes (#) for
+blocks. The function should raise an Invalid_argument exception for
+heights greater than 23. (Why? I don't know. That's just how CS50 did
+it.)
 
     # mario 5 ;;
         ##
@@ -375,11 +401,11 @@ let mario (height : int) : unit =
   else
     (* for `height` lines *)
     for line = 0 to (height - 1) do
-      (* print `height - line - 1` spaces *)
+      (* print a decreasing number of spaces *)
       for _spaces = 1 to (height - line - 1) do
         print_string " ";
       done;
-      (* and `line + 2` hashes *)
+      (* and an increasing number of  hashes *)
       for _hashes = 1 to (line + 2) do
         print_string "#";
       done;
